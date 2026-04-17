@@ -1,0 +1,11 @@
+node_modules
+dist
+data
+.env
+.env.*
+.git
+.github
+.claude
+*.log
+.DS_Store
+C:/Users/themo/AppData
