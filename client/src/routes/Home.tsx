@@ -99,13 +99,13 @@ export default function Home() {
         <div className="relative max-w-container mx-auto px-6 pt-16 pb-10 md:pt-24 md:pb-14 grid md:grid-cols-[1fr_auto] gap-10 items-end">
           <div className="animate-fade-up">
             <div className="text-overline uppercase tracking-widest text-terracotta mb-3">
-              Live GPU pricing on brev.nvidia.com
+              A Brev integration · GPU price index
             </div>
             <h1 className="font-serif text-display text-nearblack">
-              Track every GPU,<br />every provider, every hour.
+              The authoritative price<br />for every GPU Brev runs.
             </h1>
             <p className="text-bodylarge text-olive mt-6 max-w-2xl">
-              A small local dashboard that polls the Brev catalog, persists snapshots, and draws fast time-series charts. No mock data. No dashboards-as-a-service.
+              A live price index for GPU compute across every provider in the Brev catalog. Continuous polling, persisted history, live time-series charts. Built as an integration into <a href="https://brev.nvidia.com" target="_blank" rel="noreferrer" className="text-charcoal underline decoration-bordercream hover:text-terracotta">brev.nvidia.com</a>.
             </p>
           </div>
           <div className="animate-fade-up" style={{ animationDelay: "150ms" }}>

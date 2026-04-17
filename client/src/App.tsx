@@ -15,8 +15,8 @@ export default function App() {
       </main>
       <footer className="border-t border-bordercream py-10 mt-20">
         <div className="max-w-container mx-auto px-6 text-caption text-stone flex justify-between">
-          <span>Brev Tracker · pricing data from <a className="underline decoration-bordercream hover:text-terracotta" href="https://brev.nvidia.com" target="_blank" rel="noreferrer">brev.nvidia.com</a></span>
-          <span>Local · uPlot · SQLite</span>
+          <span>Brev Price Index · an integration for <a className="underline decoration-bordercream hover:text-terracotta" href="https://brev.nvidia.com" target="_blank" rel="noreferrer">brev.nvidia.com</a></span>
+          <span className="font-mono">v0.1 · uPlot · SQLite</span>
         </div>
       </footer>
     </div>

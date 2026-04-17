@@ -8,8 +8,13 @@ export default function Nav() {
   return (
     <header className="sticky top-0 z-30 bg-parchment/90 backdrop-blur border-b border-bordercream">
       <div className="max-w-container mx-auto px-6 h-16 flex items-center justify-between">
-        <NavLink to="/" className="font-serif text-feature text-nearblack">
-          Brev<span className="text-terracotta">·</span>Tracker
+        <NavLink to="/" className="flex items-baseline gap-2 text-nearblack">
+          <span className="font-serif text-feature">Brev</span>
+          <span className="text-terracotta font-serif text-feature">·</span>
+          <span className="font-serif text-feature">Index</span>
+          <span className="hidden md:inline text-overline uppercase tracking-widest text-stone ml-1">
+            Price Index
+          </span>
         </NavLink>
         <nav className="flex items-center gap-1">
           <NavLink to="/" end className={({ isActive }) => `${linkBase} ${isActive ? linkActive : ""}`}>

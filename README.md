@@ -1,8 +1,8 @@
-# Brev Tracker
+# Brev Price Index
 
-A local website that tracks GPU pricing across cloud providers over time. Pricing is sourced from the public [getdeploying.com](https://getdeploying.com) catalog (no auth required), persisted to SQLite, and rendered as fast time-series charts with [uPlot](https://leeoniya.github.io/uPlot/). Styled per `DESIGN.md`.
+The authoritative live price index for every GPU in the [Brev](https://brev.nvidia.com) catalog. A continuously-polling integration that tracks per-provider, per-region GPU pricing across every cloud Brev runs on, persists snapshots to SQLite, and renders fast time-series charts with [uPlot](https://leeoniya.github.io/uPlot/). Styled per `DESIGN.md`.
 
-The Brev catalog itself is private (kas-token required and short-lived). The underlying providers Brev aggregates — Lambda, RunPod, Crusoe, Shadeform, Nebius, AWS, GCP, etc. — are all public, and getdeploying mirrors them.
+Pricing is sourced from the public [getdeploying.com](https://getdeploying.com) catalog (no auth required), which mirrors the same providers Brev aggregates — Lambda, RunPod, Crusoe, Shadeform, Nebius, AWS, GCP, and more.
 
 ## Setup
 
