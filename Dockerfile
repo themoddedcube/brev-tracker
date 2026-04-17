@@ -30,9 +30,10 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/package.json ./package.json
 
-# Persistent SQLite lives in /app/data — mount a Railway volume here.
+# Persistent SQLite lives in /app/data.
+# On Railway: attach a volume in the service UI with mount path /app/data.
+# On plain docker run: pass `-v brev_data:/app/data`.
 RUN mkdir -p /app/data
-VOLUME ["/app/data"]
 
 # Railway sets $PORT; default for local docker run
 ENV PORT=3001
