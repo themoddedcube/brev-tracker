@@ -2,6 +2,7 @@ import { Routes, Route } from "react-router-dom";
 import Nav from "./components/Nav";
 import Home from "./routes/Home";
 import GpuDetail from "./routes/GpuDetail";
+import Api from "./routes/Api";
 
 export default function App() {
   return (
@@ -11,6 +12,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/gpu/:name" element={<GpuDetail />} />
+          <Route path="/api" element={<Api />} />
         </Routes>
       </main>
       <footer className="border-t border-bordercream py-10 mt-20">

@@ -206,6 +206,205 @@ export function providersForGpu(gpuName: string): ProviderForGpu[] {
 // Sparkline data: most recent N points of the cheapest per-GPU price per snapshot.
 export type SparkPoint = { t: number; price: number };
 
+// One row per GPU showing the current cheapest available config.
+// Used for /v1/cheapest and as the foundation for autonomous agent selection.
+export type CheapestRow = {
+  gpu_name: string;
+  provider: string;
+  type: string;
+  config_name: string;
+  gpu_count: number;
+  gpu_memory_gib: number;
+  vcpu: number;
+  memory_gib: number;
+  price_per_gpu: number;
+  price_total_per_hr: number;
+  is_available: number;
+  region: string;
+};
+
+export function cheapestPerGpu(opts: {
+  availableOnly?: boolean;
+  minVramGib?: number;
+  maxPricePerGpu?: number;
+  provider?: string;
+  gpuCount?: number;
+} = {}): CheapestRow[] {
+  const latest = getLatestSnapshot();
+  if (!latest) return [];
+  const where: string[] = ["snapshot_id = ?"];
+  const params: any[] = [latest.id];
+  if (opts.availableOnly) where.push("is_available = 1");
+  if (opts.minVramGib != null) { where.push("gpu_memory_gib >= ?"); params.push(opts.minVramGib); }
+  if (opts.maxPricePerGpu != null) { where.push("(price_usd_per_hr / gpu_count) <= ?"); params.push(opts.maxPricePerGpu); }
+  if (opts.provider) { where.push("provider = ?"); params.push(opts.provider); }
+  if (opts.gpuCount != null) { where.push("gpu_count = ?"); params.push(opts.gpuCount); }
+
+  // For each gpu_name pick the row with the lowest price_per_gpu.
+  return db
+    .prepare(
+      `WITH ranked AS (
+         SELECT gpu_name, provider, type, sub_location AS config_name,
+                gpu_count, gpu_memory_gib, vcpu, memory_gib,
+                (price_usd_per_hr / gpu_count) AS price_per_gpu,
+                price_usd_per_hr AS price_total_per_hr,
+                is_available, location AS region,
+                ROW_NUMBER() OVER (
+                  PARTITION BY gpu_name
+                  ORDER BY (price_usd_per_hr / gpu_count) ASC
+                ) AS rn
+         FROM instances
+         WHERE ${where.join(" AND ")}
+       )
+       SELECT * FROM ranked WHERE rn = 1 ORDER BY price_per_gpu ASC`,
+    )
+    .all(...params) as CheapestRow[];
+}
+
+// Single best match across the entire catalog for given filters.
+// This is the "auto-pick the cheapest GPU that meets my requirements" endpoint.
+export function bestMatch(opts: {
+  gpuName?: string;
+  minVramGib?: number;
+  maxPricePerGpu?: number;
+  provider?: string;
+  minGpuCount?: number;
+  availableOnly?: boolean;
+}): CheapestRow | null {
+  const latest = getLatestSnapshot();
+  if (!latest) return null;
+  const where: string[] = ["snapshot_id = ?"];
+  const params: any[] = [latest.id];
+  if (opts.availableOnly !== false) where.push("is_available = 1");
+  if (opts.gpuName) { where.push("gpu_name = ?"); params.push(opts.gpuName); }
+  if (opts.minVramGib != null) { where.push("gpu_memory_gib >= ?"); params.push(opts.minVramGib); }
+  if (opts.maxPricePerGpu != null) { where.push("(price_usd_per_hr / gpu_count) <= ?"); params.push(opts.maxPricePerGpu); }
+  if (opts.provider) { where.push("provider = ?"); params.push(opts.provider); }
+  if (opts.minGpuCount != null) { where.push("gpu_count >= ?"); params.push(opts.minGpuCount); }
+
+  const r = db
+    .prepare(
+      `SELECT gpu_name, provider, type, sub_location AS config_name,
+              gpu_count, gpu_memory_gib, vcpu, memory_gib,
+              (price_usd_per_hr / gpu_count) AS price_per_gpu,
+              price_usd_per_hr AS price_total_per_hr,
+              is_available, location AS region
+       FROM instances
+       WHERE ${where.join(" AND ")}
+       ORDER BY (price_usd_per_hr / gpu_count) ASC
+       LIMIT 1`,
+    )
+    .get(...params) as CheapestRow | undefined;
+  return r ?? null;
+}
+
+// Search / filter across the catalog. Like bestMatch but returns many.
+export function searchInstances(opts: {
+  gpuName?: string;
+  minVramGib?: number;
+  maxPricePerGpu?: number;
+  provider?: string;
+  minGpuCount?: number;
+  maxGpuCount?: number;
+  availableOnly?: boolean;
+  limit?: number;
+}): CheapestRow[] {
+  const latest = getLatestSnapshot();
+  if (!latest) return [];
+  const where: string[] = ["snapshot_id = ?"];
+  const params: any[] = [latest.id];
+  if (opts.availableOnly !== false) where.push("is_available = 1");
+  if (opts.gpuName) { where.push("gpu_name = ?"); params.push(opts.gpuName); }
+  if (opts.minVramGib != null) { where.push("gpu_memory_gib >= ?"); params.push(opts.minVramGib); }
+  if (opts.maxPricePerGpu != null) { where.push("(price_usd_per_hr / gpu_count) <= ?"); params.push(opts.maxPricePerGpu); }
+  if (opts.provider) { where.push("provider = ?"); params.push(opts.provider); }
+  if (opts.minGpuCount != null) { where.push("gpu_count >= ?"); params.push(opts.minGpuCount); }
+  if (opts.maxGpuCount != null) { where.push("gpu_count <= ?"); params.push(opts.maxGpuCount); }
+  const limit = Math.min(500, Math.max(1, opts.limit ?? 100));
+
+  return db
+    .prepare(
+      `SELECT gpu_name, provider, type, sub_location AS config_name,
+              gpu_count, gpu_memory_gib, vcpu, memory_gib,
+              (price_usd_per_hr / gpu_count) AS price_per_gpu,
+              price_usd_per_hr AS price_total_per_hr,
+              is_available, location AS region
+       FROM instances
+       WHERE ${where.join(" AND ")}
+       ORDER BY price_per_gpu ASC
+       LIMIT ?`,
+    )
+    .all(...params, limit) as CheapestRow[];
+}
+
+// Biggest price movers in a window. Compare the most recent snapshot's
+// cheapest price for each GPU against the cheapest at the start of window.
+export type Mover = {
+  gpu_name: string;
+  price_now: number;
+  price_then: number;
+  delta: number;
+  delta_pct: number;
+  provider_now: string;
+};
+
+export function getMovers(windowMs: number, limit = 20): Mover[] {
+  const latest = getLatestSnapshot();
+  if (!latest) return [];
+  const cutoff = Date.now() - windowMs;
+  // For each GPU: cheapest price now (latest snapshot) and cheapest "then" (oldest snapshot >= cutoff)
+  const rows = db
+    .prepare(
+      `WITH bounds AS (
+         SELECT gpu_name,
+                MIN(s.fetched_at) AS first_at,
+                MAX(s.fetched_at) AS last_at
+         FROM snapshots s
+         JOIN instances i ON i.snapshot_id = s.id
+         WHERE s.ok = 1 AND s.fetched_at >= ? AND i.is_available = 1
+         GROUP BY i.gpu_name
+       ),
+       priced AS (
+         SELECT i.gpu_name,
+                s.fetched_at,
+                MIN(i.price_usd_per_hr / i.gpu_count) AS price,
+                (
+                  SELECT i2.provider FROM instances i2
+                  WHERE i2.snapshot_id = s.id AND i2.gpu_name = i.gpu_name AND i2.is_available = 1
+                  ORDER BY (i2.price_usd_per_hr / i2.gpu_count) ASC LIMIT 1
+                ) AS provider
+         FROM snapshots s
+         JOIN instances i ON i.snapshot_id = s.id
+         WHERE s.ok = 1 AND i.is_available = 1
+         GROUP BY i.gpu_name, s.fetched_at
+       )
+       SELECT b.gpu_name,
+              p_now.price AS price_now,
+              p_now.provider AS provider_now,
+              p_then.price AS price_then
+       FROM bounds b
+       JOIN priced p_now  ON p_now.gpu_name  = b.gpu_name AND p_now.fetched_at  = b.last_at
+       JOIN priced p_then ON p_then.gpu_name = b.gpu_name AND p_then.fetched_at = b.first_at
+       WHERE p_then.price IS NOT NULL AND p_now.price IS NOT NULL`,
+    )
+    .all(cutoff) as { gpu_name: string; price_now: number; price_then: number; provider_now: string }[];
+
+  const movers: Mover[] = rows
+    .map((r) => ({
+      gpu_name: r.gpu_name,
+      price_now: r.price_now,
+      price_then: r.price_then,
+      delta: r.price_now - r.price_then,
+      delta_pct: r.price_then > 0 ? ((r.price_now - r.price_then) / r.price_then) * 100 : 0,
+      provider_now: r.provider_now,
+    }))
+    .filter((m) => m.delta !== 0)
+    .sort((a, b) => Math.abs(b.delta_pct) - Math.abs(a.delta_pct))
+    .slice(0, limit);
+
+  return movers;
+}
+
 export function getGpuSparkline(gpuName: string, points = 48): SparkPoint[] {
   return db
     .prepare(

@@ -20,6 +20,9 @@ export default function Nav() {
           <NavLink to="/" end className={({ isActive }) => `${linkBase} ${isActive ? linkActive : ""}`}>
             GPUs
           </NavLink>
+          <NavLink to="/api" className={({ isActive }) => `${linkBase} ${isActive ? linkActive : ""}`}>
+            API
+          </NavLink>
           <a
             href="https://brev.nvidia.com"
             target="_blank"
